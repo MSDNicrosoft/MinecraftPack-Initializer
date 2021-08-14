@@ -3,9 +3,12 @@ from __future__ import annotations
 import os
 import shutil
 import sys
+import urllib
 import zipfile
 from time import sleep
 import gc as gc_function
+from urllib.error import HTTPError, URLError
+import urllib.request
 from tqdm import tqdm
 import multitasking
 import signal
@@ -23,6 +26,7 @@ Pack_Name = "Minecraft 1.17.1 Fabric"
 Author_Name = "MSDNicrosoft"
 Project_Url = "https://github.com/MSDNicroosft"
 Program_Name = Pack_Name + " 整合初始化工具"
+Version = "1.0.0"
 
 ########################################################
 
@@ -30,6 +34,7 @@ Java_Selection = None
 Launcher_Selection = None
 file_size_mb = None
 Java_Exist = None
+
 
 ############################################################
 
@@ -46,6 +51,19 @@ def console_command(command):
 
 def gc():
     gc_function.collect()
+
+
+def download_file(url, filename):
+    try:
+        print(f'下载 {filename} 中...')
+        f = urllib.request.urlopen(url)
+        with open(filename, 'wb+') as local_file:
+            local_file.write(f.read())
+    except HTTPError:
+        print("网络错误！")
+    except URLError:
+        print("链接错误！")
+
 
 def check_java():
     global Java_Exist
@@ -85,6 +103,7 @@ def check_java():
     else:
         Java_Exist = True
 
+
 def extract_file(src_file, target_path):
     file = zipfile.ZipFile(src_file)
     try:
@@ -105,10 +124,12 @@ def select_launcher():
         print("输入错误，请重试！")
         select_launcher()
     elif Launcher_Selection in [
-        "HMCL", "HMCl", "HMcl", "HmCL", "HmCl", "Hmcl", "hmCL", "hmCl", "hmcl", "hMCL", "hMcl", "hMCl", "hMcL",
-        "PCL2", "PCl2", "Pcl2", "PcL2", "pCL2", "pCl2", "pcL2", "pcl", "PCL", "PCl", "Pcl", "PcL", "pCL", "pCl", "pcL"]:
-        if Launcher_Selection in ["HMCL", "HMCl", "HMcl", "HmCL", "HmCl", "Hmcl", "hmCL", "hmCl", "hmcl", "hMCL",
-                                  "hMcl", "hMCl", "hMcL"]:
+        "HMCL", "HMCl", "HMcl", "HmCL", "HmCl", "Hmcl", "hmCL", "hmCl", "hmcl", "hMCL", "hMcl", "hMCl", "hMcL", "HmcL"
+                                                                                                                "PCL2",
+        "PCl2", "Pcl2", "PcL2", "pCL2", "pCl2", "pcL2", "pcl", "PCL", "PCl", "Pcl", "PcL", "pCL", "pCl", "pcL"]:
+        if Launcher_Selection in ["HMCL", "HMCl", "HMcl", "HmCL", "HmCl", "Hmcl", "hmCL", "hmCl", "hmcl", "hMCL", "HmcL"
+                                                                                                                  "hMcl",
+                                  "hMCl", "hMcL"]:
             Launcher_Selection = True
         else:
             Launcher_Selection = False
@@ -116,6 +137,7 @@ def select_launcher():
 
 def java_confirm():
     global Java_Selection
+    clean_screen()
     console_command('title ' + Program_Name + " - Java 确认")
     Java_Selection = input("你是否已安装 Java 16？（y/n）")
     if Java_Selection not in ["y", "Y", "n", "N"]:
@@ -128,10 +150,13 @@ def java_confirm():
         else:
             Java_Selection = False
 
+
 def java_process():
     if not Java_Selection:
         print("正在下载文件")
-        console_command('curl -O https://mirrors.tuna.tsinghua.edu.cn/AdoptOpenJDK/16/jre/x64/windows/OpenJDK16U-jre_x64_windows_hotspot_16.0.1_9.zip')
+        download_file(
+            r'https://mirrors.tuna.tsinghua.edu.cn/AdoptOpenJDK/16/jre/x64/windows/OpenJDK16U-jre_x64_windows_hotspot_16.0.1_9.zip',
+            f'OpenJDK16U-jre_x64_windows_hotspot_16.0.1_9.zip')
         sleep(0.4)
         extract_file(r'OpenJDK16U-jre_x64_windows_hotspot_16.0.1_9.zip', None)
         try:
@@ -146,12 +171,16 @@ def java_process():
             os.remove("jdk-16.0.1+9-jre")
         except FileNotFoundError:
             pass
+
+
 def launcher_process():
     if Launcher_Selection:
         check_java()
-        console_command('curl http://ci.huangyuhui.net/job/HMCL/lastSuccessfulBuild/artifact/HMCL/build/libs/HMCL-3.3.196.exe')
+        download_file(
+            r'http://ci.huangyuhui.net/job/HMCL/lastSuccessfulBuild/artifact/HMCL/build/libs/HMCL-3.3.196.exe',
+            f'HMCL.exe')
     else:
-        console_command('curl https://download1325.mediafire.com/w26ivjyiawbg/4pttqgt3ogrp848/PCL.exe')
+        download_file(r'https://download1325.mediafire.com/w26ivjyiawbg/4pttqgt3ogrp848/PCL.exe', f'PCL.exe')
 
 
 ##############################################################
@@ -166,7 +195,8 @@ clean_screen()
 console_command("title " + Program_Name)
 print("欢迎使用 " + Program_Name + "\n"
                                "程序作者：" + Author_Name + "\n"
-                                                       "项目地址：" + Project_Url + "\n\n"
+                                                       "项目地址：" + Project_Url + "\n"
+                                                                               "当前版本" + Version + "\n\n"
       )
 input("按下回车键以开始初始化")
 clean_screen()
