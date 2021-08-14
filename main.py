@@ -1,15 +1,14 @@
 # -*- coding: UTF-8 -*-
 from __future__ import annotations
 import os
+import shutil
 import sys
 import zipfile
 from time import sleep
 import gc as gc_function
-import requests
 from tqdm import tqdm
 import multitasking
 import signal
-from retry import retry
 from os.path import join
 from subprocess import CalledProcessError
 from shutil import which
@@ -86,85 +85,6 @@ def check_java():
     else:
         Java_Exist = True
 
-def download_file(url, file_name):
-    MB = 1024 ** 2  # 定义 1 MB 多少为 B
-
-    def split(start: int, end: int, step: int) -> list[tuple[int, int]]:
-        parts = [(start, min(start + step, end))  # 分多块
-                 for start in range(0, end, step)]
-        return parts
-
-    def get_file_size(url: str) -> int:
-        '''
-        获取文件大小
-        Parameters
-        ----------
-        url : 文件直链
-        ------
-        文件大小（B 为单位）
-        '''
-        global file_size_mb
-        response = requests.head(url)
-        file_size_b = response.headers.get('Content-Length')
-        file_size_b_int = int(file_size_b)
-        file_size_mb = file_size_b_int // 1048576
-        return int(file_size_b_int)
-
-    def download(url: str, file_name: str, retry_times: int = 3, each_size=16 * MB) -> None:
-
-        '''
-        根据文件直链和文件名下载文件
-        Parameters
-        ----------
-        url : 文件直链
-        file_name : 文件名
-        retry_times: 可选的，每次连接失败重试次数
-        Return
-        ------
-        :param each_size:
-        '''
-
-        f = open(file_name, 'wb')
-        file_size_b_int = get_file_size(url)
-
-        @retry(tries=retry_times)
-        @multitasking.task
-        def start_download(start: int, end: int) -> None:
-            '''
-            根据文件起止位置下载文件
-            Parameters
-            ----------
-            start : 开始位置
-            end : 结束位置
-            '''
-            response = session.get(url, stream=True)
-            chunk_size = 128  # 每次读取的流式响应大小
-            chunks = []  # 暂存已获取的响应，后续循环写入
-            for chunk in response.iter_content(chunk_size=chunk_size):
-                # 暂存获取的响应
-                chunks.append(chunk)
-                # 更新进度条
-            f.seek(start)
-            for chunk in chunks:
-                f.write(chunk)
-            # 释放已写入的资源
-            del chunks
-
-        session = requests.Session()  # 分块文件如果比文件大，就取文件大小为分块大小
-        each_size = min(each_size, file_size_b_int)  # 分块
-        parts = split(0, file_size_b_int, each_size)  # 创建进度条
-        file_size_mb_str = str(file_size_mb)
-        print("正在下载文件：" + file_name + "  大小：" + file_size_mb_str + " MB\n请稍等...")
-        for part in parts:
-            start, end = part
-            start_download(start, end)
-        # 等待全部线程结束
-        multitasking.wait_for_tasks()
-        f.close()
-
-    if "__main__" == __name__:
-        download(url, file_name)
-
 def extract_file(src_file, target_path):
     file = zipfile.ZipFile(src_file)
     try:
@@ -210,21 +130,28 @@ def java_confirm():
 
 def java_process():
     if not Java_Selection:
-        download_file(
-            r'https://mirrors.tuna.tsinghua.edu.cn/AdoptOpenJDK/16/jre/x64/windows/OpenJDK16U-jre_x64_windows_hotspot_16.0.1_9.zip',
-            f'OpenJDK16U-jre_x64_windows_hotspot_16.0.1_9.zip')
+        print("正在下载文件")
+        console_command('curl -O https://mirrors.tuna.tsinghua.edu.cn/AdoptOpenJDK/16/jre/x64/windows/OpenJDK16U-jre_x64_windows_hotspot_16.0.1_9.zip')
         sleep(0.4)
-        extract_file(r'OpenJDK16U-jre_x64_windows_hotspot_16.0.1_9.zip', '.minecraft/')
-        os.remove(r'OpenJDK16U-jre_x64_windows_hotspot_16.0.1_9.zip')
-        os.rename(r'.minecraft/jdk-16.0.1+9-jre', r'runtime')
-        os.remove(r'.minecraft/runtime/lib/src.zip')
-
+        extract_file(r'OpenJDK16U-jre_x64_windows_hotspot_16.0.1_9.zip', None)
+        try:
+            os.remove(r'OpenJDK16U-jre_x64_windows_hotspot_16.0.1_9.zip')
+            console_command('ren jdk-16.0.1+9-jre runtime')
+            os.remove(r'runtime/lib/src.zip')
+        except FileNotFoundError:
+            pass
+        shutil.move("runtime", ".minecraft/runtime")
+        sleep(2)
+        try:
+            os.remove("jdk-16.0.1+9-jre")
+        except FileNotFoundError:
+            pass
 def launcher_process():
     if Launcher_Selection:
         check_java()
-        download_file(r'http://ci.huangyuhui.net/job/HMCL/lastSuccessfulBuild/artifact/HMCL/build/libs/HMCL-3.3.196.exe', f'HMCL.exe')
+        console_command('curl http://ci.huangyuhui.net/job/HMCL/lastSuccessfulBuild/artifact/HMCL/build/libs/HMCL-3.3.196.exe')
     else:
-        download_file(r'https://download1325.mediafire.com/w26ivjyiawbg/4pttqgt3ogrp848/PCL.exe', f'PCL.exe')
+        console_command('curl https://download1325.mediafire.com/w26ivjyiawbg/4pttqgt3ogrp848/PCL.exe')
 
 
 ##############################################################
@@ -236,7 +163,7 @@ for _ in tqdm(range(1, 101)):
 print("完成！")
 sleep(0.7)
 clean_screen()
-
+console_command("title " + Program_Name)
 print("欢迎使用 " + Program_Name + "\n"
                                "程序作者：" + Author_Name + "\n"
                                                        "项目地址：" + Project_Url + "\n\n"
@@ -254,4 +181,3 @@ clean_screen()
 print(Program_Name + "已初始化完成！")
 print("你可以删除此程序了！")
 input("\n\n按下回车退出此程序")
-
