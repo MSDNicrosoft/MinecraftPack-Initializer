@@ -152,8 +152,8 @@ def java_process():
     if not Java_Selection:
         print("正在下载文件")
         download_file(
-            r'https://mirrors.tuna.tsinghua.edu.cn/AdoptOpenJDK/16/jre/x64/windows/OpenJDK16U-jre_x64_windows_hotspot_16.0.1_9.zip',
-            f'OpenJDK16U-jre_x64_windows_hotspot_16.0.1_9.zip')
+            'https://mirrors.tuna.tsinghua.edu.cn/AdoptOpenJDK/16/jre/x64/windows/OpenJDK16U-jre_x64_windows_hotspot_16.0.1_9.zip',
+            'OpenJDK16U-jre_x64_windows_hotspot_16.0.1_9.zip')
         sleep(0.4)
         extract_file(r'OpenJDK16U-jre_x64_windows_hotspot_16.0.1_9.zip', None)
         try:
@@ -174,10 +174,10 @@ def launcher_process():
     if Launcher_Selection:
         Java_Exist = check_java()
         download_file(
-            r'http://ci.huangyuhui.net/job/HMCL/lastSuccessfulBuild/artifact/HMCL/build/libs/HMCL-3.3.196.exe',
-            f'HMCL.exe')
+            'http://ci.huangyuhui.net/job/HMCL/lastSuccessfulBuild/artifact/HMCL/build/libs/HMCL-3.3.196.exe',
+            'HMCL.exe')
     else:
-        download_file(r'https://download1325.mediafire.com/w26ivjyiawbg/4pttqgt3ogrp848/PCL.exe', f'PCL.exe')
+        download_file('https://download1325.mediafire.com/w26ivjyiawbg/4pttqgt3ogrp848/PCL.exe', 'PCL.exe')
 
 
 ##############################################################
@@ -190,10 +190,10 @@ print("完成！")
 sleep(0.7)
 clean_screen()
 console_command("title " + Program_Name)
-print("欢迎使用 " + Program_Name + "\n"
-                               "程序作者：" + Author_Name + "\n"
-                                                       "项目地址：" + Project_Url + "\n"
-                                                                               "当前版本" + Version + "\n\n"
+print("欢迎使用",Program_Name + "\n"
+                               "程序作者：",Author_Name + "\n"
+                                                       "项目地址：",Project_Url + "\n"
+                                                                               "当前版本",Version + "\n\n"
       )
 input("按下回车键以开始初始化")
 clean_screen()
