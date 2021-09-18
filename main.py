@@ -66,7 +66,6 @@ def download_file(url, filename):
 
 
 def check_java():
-    global Java_Exist
     results = []
     if not results:
         for flag in [winreg.KEY_WOW64_64KEY, winreg.KEY_WOW64_32KEY]:
@@ -99,9 +98,9 @@ def check_java():
         results.append(which('java.exe', path=os.environ['ProgramFiles(x86)']))
     results = [path for path in results if path is not None]
     if not results:
-        Java_Exist = False
+        return False
     else:
-        Java_Exist = True
+        return True
 
 
 def extract_file(src_file, target_path):
@@ -114,7 +113,6 @@ def extract_file(src_file, target_path):
 
 
 def select_launcher():
-    global Launcher_Selection
     console_command('title ' + Program_Name + " - 选择使用的启动器")
     Launcher_Selection = input("你想使用哪个启动器来启动你的游戏：\n" + "HMCL \ PCL2" + "\n")
     if Launcher_Selection not in [
@@ -130,13 +128,12 @@ def select_launcher():
         if Launcher_Selection in ["HMCL", "HMCl", "HMcl", "HmCL", "HmCl", "Hmcl", "hmCL", "hmCl", "hmcl", "hMCL", "HmcL"
                                                                                                                   "hMcl",
                                   "hMCl", "hMcL"]:
-            Launcher_Selection = True
+            return True
         else:
-            Launcher_Selection = False
+            return False
 
 
 def java_confirm():
-    global Java_Selection
     clean_screen()
     console_command('title ' + Program_Name + " - Java 确认")
     Java_Selection = input("你是否已安装 Java 16？（y/n）")
@@ -146,9 +143,9 @@ def java_confirm():
         java_confirm()
     elif Java_Selection in ["y", "Y", "n", "N"]:
         if Java_Selection in ["y", "Y"]:
-            Java_Selection = True
+            return True
         else:
-            Java_Selection = False
+            return False
 
 
 def java_process():
@@ -175,7 +172,7 @@ def java_process():
 
 def launcher_process():
     if Launcher_Selection:
-        check_java()
+        Java_Exist = check_java()
         download_file(
             r'http://ci.huangyuhui.net/job/HMCL/lastSuccessfulBuild/artifact/HMCL/build/libs/HMCL-3.3.196.exe',
             f'HMCL.exe')
@@ -200,8 +197,8 @@ print("欢迎使用 " + Program_Name + "\n"
       )
 input("按下回车键以开始初始化")
 clean_screen()
-select_launcher()
-java_confirm()
+Launcher_Selection = select_launcher()
+Java_Selection = java_confirm()
 console_command('title ' + Program_Name + ' - 文件补全')
 clean_screen()
 java_process()
