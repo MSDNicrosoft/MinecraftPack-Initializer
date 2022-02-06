@@ -1,6 +1,7 @@
 # -*- coding: UTF-8 -*-
 from __future__ import annotations
 import os
+import re
 import shutil
 import sys
 import urllib
@@ -114,15 +115,14 @@ def select_launcher():
     Launcher_Selection = str.upper(
         input("你想使用哪个启动器来启动你的游戏 :\n" + "HMCL \ PCL2" + "\n")
         )
-    if Launcher_Selection not in ["PCL", "HMCL"]:
+    if Launcher_Selection =="HMCL":
+        return True
+    elif Launcher_Selection == "PCL":
+        return False
+    else:
         clean_screen()
         print("输入错误,请重试 !")
-        select_launcher()
-    elif Launcher_Selection in ["PCL", "HMCL"]:
-        if Launcher_Selection in ["PCL", "HMCL"]:
-            return True
-        else:
-            return False
+        select_launcher()    
 
 
 def java_confirm():
@@ -131,15 +131,14 @@ def java_confirm():
     Java_Selection = str.upper(
         input("你是否已安装 Java 17 ?(y/n)")
         )
-    if Java_Selection not in ["Y", "N"]:
+    if Java_Selection == "Y":
+        return True
+    elif Java_Selection == "N":
+        return False
+    else:
         clean_screen()
         print("输入错误,请重试!")
         java_confirm()
-    elif Java_Selection in ["Y", "N"]:
-        if Java_Selection == "Y":
-            return True
-        else:
-            return False
 
 
 async def java_process():
