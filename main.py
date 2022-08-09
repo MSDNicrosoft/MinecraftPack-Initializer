@@ -1,63 +1,84 @@
 # -*- coding: UTF-8 -*-
 from __future__ import annotations
 import os
-import re
 import shutil
 import sys
 import urllib
 import zipfile
 from time import sleep
-import gc as gc_function
 from urllib.error import HTTPError, URLError
 import urllib.request
 from tqdm import tqdm
-import multitasking
-import signal
-import asyncio
-# from os.path import join
+# import multitasking
+# import signal
+
 # from subprocess import CalledProcessError
 # from shutil import which
 # import subprocess
 # import winreg
 
-signal.signal(signal.SIGINT, multitasking.killall)
+# signal.signal(signal.SIGINT, multitasking.killall)
 
 ########################################################
 
-Pack_Name = "Minecraft 1.17.1 Fabric"
-Author_Name = "MSDNicrosoft"
-Project_Url = "https://github.com/MSDNicroosft/MinecraftPack-Initializer"
-Program_Name = f"{Pack_Name} 整合初始化工具"
-Version = "1.0.0"
+PACK_NAME = "Minecraft 1.17.1 Fabric"
+AUTHOR_NAME = "MSDNicrosoft"
+PROJECT_URL = "https://github.com/MSDNicroosft/MinecraftPack-Initializer"
+PROGRAM_NAME = f"{PACK_NAME} 整合初始化工具"
+VERSION = "1.0.0"
+
 
 ########################################################
 
 
-def clean_screen():
+def clean_screen():  # 如果直接调用会导致在清空后出现个 0
     old_stdout = sys.stdout  # 保存默认的 Python 标准输出
-    os.system('cls')
+    if sys.platform.startswith('linux'):
+        os.system('clear')
+    elif sys.platform.startswith('win'):
+        os.system('cls')
+    elif sys.platform.startswith('darwin'):
+        os.system('clear')
     sys.stdout = old_stdout  # 恢复 Python 默认的标准输出
 
 
-def command(command):
-    os.system(command)
+def str2bool(v: str):
+    if isinstance(v, bool):
+        return v
+    elif v.upper().strip() == "Y":
+        return True
+    elif v.upper().strip() == "N":
+        return False
 
 
-def gc():
-    gc_function.collect()
+def command(text):
+    os.system(text)
 
 
-async def download_file(url, filename):
+def download_file(url, filename):
     try:
         print(f"下载 {filename} 中...")
         f = urllib.request.urlopen(url)
         with open(filename, 'wb+') as local_file:
-            await local_file.write(f.read())
+            local_file.write(f.read())
         del f
     except HTTPError:
         print("网络错误 !")
     except URLError:
         print("链接错误 !")
+
+
+def extract_file(src_file, target_path, remove_src_after_extracted):
+    with zipfile.ZipFile(src_file) as f:
+        try:
+            f.extractall(path=target_path)
+        except RuntimeError:
+            print(f"解压失败 !")
+    if remove_src_after_extracted:
+        try:
+            os.remove(src_file)
+        except FileNotFoundError:
+            pass
 
 
 """
@@ -100,107 +121,73 @@ def check_java():
 """
 
 
-
-def extract_file(src_file, target_path):
-    file = zipfile.ZipFile(src_file)
-    try:
-        file.extractall(path=target_path)
-    except RuntimeError:
-        print("解压失败 !")
-        file.close()
-
-
 def select_launcher():
-    command(f"title {Program_Name} - 选择使用的启动器")
-    Launcher_Selection = str.upper(
-        input("你想使用哪个启动器来启动你的游戏 :\n" + "HMCL \ PCL2" + "\n")
-        )
-    if Launcher_Selection =="HMCL":
-        return True
-    elif Launcher_Selection == "PCL":
-        return False
-    else:
+    command(f"title {PROGRAM_NAME} - 选择使用的启动器")
+    Launcher_Selection = str(
+        input("你想使用哪个启动器来启动你的游戏(\"HMCL \ PCL\"):")
+    )
+    if not Launcher_Selection.upper().strip() in ["Y", "N"]:
         clean_screen()
         print("输入错误,请重试 !")
-        select_launcher()    
+        select_launcher()
+    else:
+        return str2bool(Launcher_Selection)
 
 
 def java_confirm():
     clean_screen()
-    command(f"title {Program_Name} Java 确认")
-    Java_Selection = str.upper(
+    command(f"title {PROGRAM_NAME} Java 确认")
+    Java_Selection = str(
         input("你是否已安装 Java 17 ?(y/n)")
-        )
-    if Java_Selection == "Y":
-        return True
-    elif Java_Selection == "N":
-        return False
-    else:
+    )
+    if not Java_Selection.upper().strip() in ["Y", "N"]:
         clean_screen()
-        print("输入错误,请重试!")
-        java_confirm()
+        print("输入错误,请重试 !")
+    else:
+        return str2bool(Java_Selection)
 
 
-async def java_process():
-    if not Java_Selection:
+def java_process():
+    if not java_confirm():
         print("正在下载文件")
-        asyncio.run(
-            download_file(
-            'https://mirrors.tuna.tsinghua.edu.cn/AdoptOpenJDK/16/jre/x64/windows/ibm-semeru-open-jre_x64_windows_16.0.2_7_openj9-0.27.0.zip',
-            'ibm-semeru-open-jre_x64_windows_16.0.2_7_openj9-0.27.0.zip')
-            )
+        download_file(
+            '',  # TODO: 等芒果搞完国内源解析和 ZIP 支持
+            'adoptium-jdk-17.zip')
         sleep(0.4)
-        extract_file(r'ibm-semeru-open-jre_x64_windows_16.0.2_7_openj9-0.27.0.zip', None)
-        try:
-            os.remove(r'ibm-semeru-open-jre_x64_windows_16.0.2_7_openj9-0.27.0.zip')
-            command('ren jdk-16.0.1+9-jre runtime')
-            os.remove(r'runtime/lib/src.zip')
-        except FileNotFoundError:
-            pass
-        await shutil.move("runtime", ".minecraft/runtime")
-        try:
-            os.remove("jdk-16.0.1+9-jre")
-        except FileNotFoundError:
-            pass
-
+        extract_file('adoptium-jdk-17.zip', 'jdk-17', True)
+        shutil.move("jdk-17", ".minecraft/runtime")
 
 
 def launcher_process():
-    if Launcher_Selection:
-        asyncio.run(
-            download_file(
-            'http://ci.huangyuhui.net/job/HMCL/lastSuccessfulBuild/artifact/HMCL/build/libs/HMCL-3.3.196.exe',
+    if select_launcher():
+        download_file(
+            'https://assets.bluemangoo.net/api/rdl?name=hmcl',
             'HMCL.exe')
-            )
     else:
-        asyncio.run(
-            download_file('https://download1325.mediafire.com/w26ivjyiawbg/4pttqgt3ogrp848/PCL.exe', 'PCL.exe')
-        )
-
+        download_file('https://assets.bluemangoo.net/api/rdl?name=pcl', 'PCL.zip')
+        extract_file('PCL.zip', None, True)
 
 
 ##############################################################
 clean_screen()
-command(f"title {Program_Name} - 加载程序")
+command(f"title {PROGRAM_NAME} - 加载程序")
 print("程序加载中...")
-for _ in tqdm(range(1, 101)):
+for _ in tqdm(range(1, 51)):
     sleep(0.01)
 del _
 print("完成!")
-sleep(0.6)
+sleep(0.5)
 clean_screen()
-command(f"title {Program_Name}")
-print(f"欢迎使用 {Program_Name} \n程序作者: {Author_Name} \n 项目地址 : {Project_Url} \n 当前版本 {Version} \n\n")
+command(f"title {PROGRAM_NAME}")
+print(f"欢迎使用 {PROGRAM_NAME} \n程序作者: {AUTHOR_NAME} \n项目地址 : {PROJECT_URL} \n当前版本 {VERSION} \n\n")
 input("按下回车键以开始初始化")
 clean_screen()
-Launcher_Selection = select_launcher()
-Java_Selection = java_confirm()
-command(f"title {Program_Name} 文件补全")
+command(f"title {PROGRAM_NAME} 文件补全")
 clean_screen()
 java_process()
 launcher_process()
-command(f"title {Program_Name}")
+command(f"title {PROGRAM_NAME}")
 clean_screen()
-print(f"{Program_Name} 已初始化完成 !")
+print(f"{PROGRAM_NAME} 已初始化完成 !")
 print("你可以删除此程序了 !")
 input("\n\n按下回车退出此程序")
