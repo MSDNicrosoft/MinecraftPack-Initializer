@@ -1,30 +1,21 @@
 # -*- coding: UTF-8 -*-
-from __future__ import annotations
 
+import json
 import os
 import shutil
+import subprocess
 import sys
-import urllib
 import zipfile
 from time import sleep
-from urllib.error import HTTPError, URLError
-import urllib.request
+from retry import retry
 from tqdm import tqdm
 import requests
 import re
 
-# import multitasking
-# import signal
-
-# from subprocess import CalledProcessError
-# from shutil import which
-# import subprocess
-# import winreg
-
-# signal.signal(signal.SIGINT, multitasking.killall)
-
 ########################################################
 
+MC_VERSION = "1.17.1"  # 需提供 Mojang 官方的版本名
+VERSION_FOLDER_NAME = "1.17.1 Fabric"  # `.minecraft/versions` 目录下的版本文件夹
 PACK_NAME = "Minecraft 1.17.1 Fabric"
 AUTHOR_NAME = "MSDNicrosoft"
 PROJECT_URL = "https://github.com/MSDNicroosft/MinecraftPack-Initializer"
@@ -46,12 +37,12 @@ def clean_screen():  # 如果直接调用会导致在清空后出现个 0
     sys.stdout = old_stdout  # 恢复 Python 默认的标准输出
 
 
-def simplify_str(string: str):
+def simplify_str(string: str) -> str:
     """Remove unnecessary blanks and all capitalized."""
     return string.upper().strip()
 
 
-def str2bool(v: str):
+def str2bool(v: str) -> bool:
     if isinstance(v, bool):
         return v
     elif simplify_str(v) == "Y":
@@ -67,22 +58,20 @@ def command(text: str):
 class download_url:
 
     @staticmethod
-    def url2json(url: str):
+    def url2json(url: str) -> dict:
         headers = {
-            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.51 Safari/537.36 Edg/99.0.1150.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.51 Safari/537.36 Edg/99.0.1150.36"
         }
         try:
             data = requests.get(url=url, headers=headers)
             return data.json()
         except (requests.HTTPError, requests.ConnectionError) as e:
-            print("网络出现了错误")
-            print(e)
+            print("网络错误")
         except requests.JSONDecodeError as e:
             print("解析错误")
-            print(e)
 
     @staticmethod
-    def launcher(name: str = None, dist_type: str = None, channel: str = None):
+    def launcher(name: str = None, dist_type: str = None, channel: str = None) -> str:
         if simplify_str(name) == "HMCL":
             if simplify_str(channel) in ["STABLE", "DEV"]:  # 版本核对
                 SRC_URL = f"https://hmcl.huangyuhui.net/api/update_link?channel={channel.lower()}&download_link=true"
@@ -90,10 +79,10 @@ class download_url:
                     target_url = download_url.url2json(SRC_URL)[dist_type.lower()]
                 else:
                     print("HMCL 所选的文件格式有误")
-                    return
+                    raise
             else:
                 print("HMCL 所选的频道有误")
-                return
+                raise
 
         elif simplify_str(name) == "PCL":
             SRC_URL = "https://afdian.net/api/post/get-detail?post_id=0164034c016c11ebafcb52540025c377"
@@ -105,48 +94,57 @@ class download_url:
             )
             target_url = "https://api.hanximeng.com/lanzou/?url=" + lanzou_URI[0]
         else:
-            return
+            raise
 
         return target_url
 
     @staticmethod
-    def java(version: int, dist_type: str):
+    def java(version: int, dist_type: str) -> str:
         SRC_URL = f"https://api.adoptium.net/v3/assets/latest/{version}/hotspot?os=windows"
         MIRROR_URL = f"https://mirrors.tuna.tsinghua.edu.cn/Adoptium/{version}/jdk/x64/windows/"
         ADOPTIUM_VERSION_LIST = [8, 11, 17, 18]
         if version not in ADOPTIUM_VERSION_LIST:  # Java 版本核对（仅可下载的）
-            return
+            raise
         unresolved_json = download_url.url2json(SRC_URL)
         if simplify_str(dist_type) == "ZIP":
             origin_url = str(unresolved_json[1]["binary"]["package"]["link"])
         elif simplify_str(dist_type) in ["EXE", "MSI"]:
             origin_url = unresolved_json[1]["binary"]["installer"]["link"]
         else:
-            return
+            raise
         file_name = origin_url.split("/")
         target_url = MIRROR_URL + file_name[-1]
         return target_url
 
 
-def download_file(url, filename):
-    try:
-        print(f"下载 {filename} 中...")
-        f = urllib.request.urlopen(url)
-        with open(filename, 'wb+') as local_file:
-            local_file.write(f.read())
-        del f
-    except HTTPError:
-        print("网络错误 !")
-    except URLError:
-        print("链接错误 !")
+@retry(tries=3)
+def download_file(target_url, file_name) -> None:
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.51 Safari/537.36 Edg/99.0.1150.36"
+    }
+
+    head = requests.head(target_url, headers=headers)  # 仅获取响应头部信息
+    file_size = head.headers.get('Content-Length')  # 以 B 为单位的文件大小
+    if file_size is not None:
+        file_size = int(file_size)
+
+    response = requests.get(url=target_url, headers=headers, stream=True)
+    # 一块文件的大小
+    chunk_size = 10240
+    bar = tqdm(total=file_size, desc=f'下载文件 {file_name}', unit_scale=True, unit_divisor=1024, unit='B')
+    with open(file_name, mode='wb') as f:
+        for chunk in response.iter_content(chunk_size=chunk_size):
+            f.write(chunk)
+            bar.update(chunk_size)
+    bar.close()  # 关闭进度条
 
 
-def extract_file(src_file, target_path, remove_src_after_extracted):
+def extract_file(src_file, target_path, remove_src_after_extracted) -> None:
     with zipfile.ZipFile(src_file) as f:
         try:
             f.extractall(path=target_path)
         except RuntimeError:
-            print(f"解压失败 !")
+            print(f"解压失败！")
     if remove_src_after_extracted:
         try:
             os.remove(src_file)
@@ -154,51 +152,72 @@ def extract_file(src_file, target_path, remove_src_after_extracted):
             pass
 
 
-def check_java_version():  # TODO: 通过 MC 版本判断安装哪个版本的 Java
-    ...
-
-
-"""
-def check_java():
-    results = []
-    if not results:
-        for flag in [winreg.KEY_WOW64_64KEY, winreg.KEY_WOW64_32KEY]:
-            try:
-                key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'Software\JavaSoft\Java Development Kit', 0,
-                                     winreg.KEY_READ | flag)
-                version, _ = winreg.QueryValueEx(key, 'CurrentVersion')
-                key.Close()
-                key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'Software\JavaSoft\Java Development Kit\%s' % version,
-                                     0, winreg.KEY_READ | flag)
-                path, _ = winreg.QueryValueEx(key, 'JavaHome')
-                key.Close()
-                path = join(str(path), 'bin')
-                subprocess.run(['"%s"' % join(path, 'java'), ' -version'], stdout=open(os.devnull, 'w'),
-                               stderr=subprocess.STDOUT, check=True)
-                results.append(path)
-            except (CalledProcessError, OSError):
-                pass
-    if not results:
-        try:
-            subprocess.run(['java', '-version'], stdout=open(os.devnull, 'w'), stderr=subprocess.STDOUT, check=True)
-            results.append('')
-        except (CalledProcessError, OSError):
-            pass
-    if not results and 'ProgramW6432' in os.environ:
-        results.append(which('java.exe', path=os.environ['ProgramW6432']))
-    if not results and 'ProgramFiles' in os.environ:
-        results.append(which('java.exe', path=os.environ['ProgramFiles']))
-    if not results and 'ProgramFiles(x86)' in os.environ:
-        results.append(which('java.exe', path=os.environ['ProgramFiles(x86)']))
-    results = [path for path in results if path is not None]
-    if not results:
-        return False
+def check_java_version() -> int:
+    # 通过提供的 MC 版本名获取
+    MANIFEST_URL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
+    global_manifest = download_url.url2json(MANIFEST_URL)
+    if MC_VERSION is "1.7.2":
+        required_java_version = 7
     else:
+        for version in global_manifest["versions"]:
+            # 如果存在 `id` 键，并且 `id` 键的值等于 `MC_VERSION`，并且存在 `url` 键
+            if version["id"] and version["id"] == MC_VERSION and version["url"]:
+                target_version = download_url.url2json(version["url"])
+                required_java_version = int(target_version["javaVersion"]["majorVersion"])
+                break
+        else:
+            # 读取包内的 json 获取
+            try:
+                with open(f"./.minecraft/versions/{VERSION_FOLDER_NAME}/{VERSION_FOLDER_NAME}.json", 'r',
+                          encoding='UTF-8') as f:
+                    LOCAL_TARGET_VERSION = json.load(f)
+            except FileNotFoundError:
+                print("版本信息文件未找到!")
+                required_java_version = 17  # 如果没有默认使用 Java 17
+            else:
+                required_java_version = int(LOCAL_TARGET_VERSION["javaVersion"]["majorVersion"])
+    return required_java_version
+
+
+def check_java() -> bool:
+    # 执行命令并返回状态码和执行结果
+    direct_execute_result = subprocess.getstatusoutput("java.exe -version")  # 直接调用命令
+    env_var_execute_result = subprocess.getstatusoutput("%JAVA_HOME%/bin/java.exe -version")  # 调用 JAVA_HOME 环境变量中的 Java
+    required_java_version = check_java_version()  # 获取此包最低所需的 Java 版本
+    if direct_execute_result[0] is 1:  # 如果直接执行失败（返回状态码为 1）
+        if env_var_execute_result[0] is 1:  # 如果 JAVA_HOME 环境变量中执行失败（返回状态码为 1）
+            found_java_execute_result = []
+            # 调用系统命令寻找 `java.exe`，以换行符分隔，转换为列表
+            where_execute_result = subprocess.getoutput("where /f java.exe").split("\n")
+            for java in where_execute_result:  # 执行 `java -version`，将执行的结果添加至列表
+                found_java_execute_result.append(subprocess.getoutput(f"{java} -version"))
+            found_java_version = []
+            for version in found_java_execute_result:
+                found_java_version.append(
+                    int(
+                        str(re.findall('(?<=version ").*(?=")', version)).split(".")[1]  # 取全版本号的次版本号作为可返回结果
+                    )
+                )
+            found_java_version = list(set(found_java_version))  # 使用 Python 集合特性，删除重复的值
+            for version in found_java_version:  # 将存在的 Java 的版本与所需的最低版本比较
+                if version >= required_java_version:  # 只要有高于所需版本的 Java 就返回 True（无需额外下载安装）
+                    return True
+            else:
+                return False
+
+        else:  # 正常执行
+            version = re.findall('(?<=version ").*(?=")', env_var_execute_result[1])
+            exist_java = int(version[0]).split(".")[1]  # 取次版本号
+    else:  # 正常执行
+        version = re.findall('(?<=version ").*(?=")', direct_execute_result[1])
+        exist_java = int(version[0]).split(".")[1]  # 取次版本号
+    if exist_java >= required_java_version:
         return True
-"""
+    else:
+        return False
 
 
-def select_launcher():
+def select_launcher() -> bool:
     command(f"title {PROGRAM_NAME} - 选择使用的启动器")
     Launcher_Selection = str(
         input("你想使用哪个启动器来启动你的游戏(\"HMCL \ PCL\"):")
@@ -211,27 +230,30 @@ def select_launcher():
         return str2bool(Launcher_Selection)
 
 
-def java_confirm():
+def java_confirm() -> bool:
     clean_screen()
     command(f"title {PROGRAM_NAME} Java 确认")
     Java_Selection = str(
-        input("你是否已安装 Java 17 ?(y/n)")
+        input(f"你是否已安装 Java {check_java_version()} ?(y/n)")
     )
     if not simplify_str(Java_Selection) in ["Y", "N"]:
         clean_screen()
         print("输入错误,请重试 !")
     else:
-        return str2bool(Java_Selection)
+        if str2bool(Java_Selection):
+            return check_java()
 
 
 def java_process():
     if not java_confirm():
         print("正在下载文件")
-        download_file(  # TODO: 等芒果搞完国内源解析和 ZIP 支持
-            download_url.java(17, "zip"),
+        download_file(
+            download_url.java(
+                version=check_java_version(),
+                dist_type="zip"),
             "adoptium-jdk-17.zip")
         sleep(0.4)
-        extract_file("adoptium-jdk-17.zip", "jdk-17", True)
+        extract_file("adoptium-jdk-17.zip", "jdk-17", remove_src_after_extracted=True)
         shutil.move("jdk-17", ".minecraft/runtime")
 
 
@@ -245,7 +267,7 @@ def launcher_process():
             download_url.launcher("PCL"),
             "PCL.zip"
         )
-        extract_file("PCL.zip", None, True)
+        extract_file("PCL.zip", None, remove_src_after_extracted=True)
 
 
 ##############################################################
