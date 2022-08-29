@@ -52,6 +52,10 @@ def str2bool(v: str) -> bool:
         return False
 
 
+def warp(string: list) -> str:
+    return "\n".join(string)
+
+
 def command(text: str):
     os.system(text)
 
@@ -61,7 +65,8 @@ class download_url:
     @staticmethod
     def url2json(url: str) -> dict:
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.51 Safari/537.36 Edg/99.0.1150.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+                          "Chrome/99.0.4844.51 Safari/537.36 Edg/99.0.1150.36 "
         }
         try:
             data = requests.get(url=url, headers=headers)
@@ -125,7 +130,8 @@ class download_url:
 @retry(tries=3)
 def download_file(target_url, file_name=None) -> None:
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.51 Safari/537.36 Edg/99.0.1150.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+                      "Chrome/99.0.4844.51 Safari/537.36 Edg/99.0.1150.36 "
     }
 
     head = requests.head(target_url, headers=headers)  # 仅获取响应头部信息
@@ -258,14 +264,12 @@ if __name__ == '__main__':
     clean_screen()
     check_platform()
     command(f"title {PROGRAM_NAME}")
-    print(f"""
-欢迎使用 {PROGRAM_NAME}
-程序作者: {AUTHOR_NAME}
-项目地址: {PROJECT_URL}
-当前版本: {VERSION}
-
-
-    """)
+    print(warp([
+        f"欢迎使用 {PROGRAM_NAME}",
+        f"程序作者: {AUTHOR_NAME}",
+        f"项目地址: {PROJECT_URL}",
+        f"当前版本: {VERSION}"
+    ]))
     input("按下回车键以开始初始化")
     clean_screen()
     command(f"title {PROGRAM_NAME} 文件补全")
