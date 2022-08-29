@@ -188,7 +188,7 @@ def check_java() -> bool:
     RESULT = False
 
     def parse_java_version(full_version: str) -> int:
-        if full_version.find("_") == -1:  # JDK
+        if not full_version.__contains__("_"):  # JDK
             return int(full_version.split(".")[0])
         else:  # JRE
             return int(full_version.split(".")[1])
@@ -235,7 +235,7 @@ def java_process():
                 version=check_java_version(),
                 dist_type="zip"),
             "adoptium-jdk.zip")
-        sleep(0.4)
+        sleep(0.3)
         extract_file("adoptium-jdk.zip", "jdk", remove_src_after_extracted=True)
         shutil.move("jdk", ".minecraft/runtime")
 
